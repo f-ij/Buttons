@@ -9,8 +9,8 @@ Button::Button(int pin, unsigned long jitterDelay, int activeState, unsigned lon
     jitterDelay(jitterDelay),
     stateRead(false),
     activeState(LOW),
-    pressWindow(500),
-    holdWindow(1000),
+    pressWindow(pressWindow),
+    holdWindow(holdWindow),
     holdTime(0),
     pressEvents(0)
 {
@@ -28,9 +28,11 @@ void Button::steadyRead(){
         lastRawTime = millis();   // note the time
     }
     else if (millis() - lastRawTime > jitterDelay){
-        steadyState = readstate;
-        stateRead = false;
-        steadyTime = millis();
+        if (readstate != steadyState){ // If the state has been steady for long enough
+            steadyState = readstate;
+            stateRead = false;
+            steadyTime = millis();
+        }
     }
     // Serial.println(millis() - lastRawTime);
     // If the state has been steady for long enough
@@ -85,7 +87,8 @@ PressType Button::monitorPress(){
                 unsigned long this_time = millis();
                 if (this_time - steadyTime > holdWindow){
                     PressType ptype = SINGLE_HOLD;
-                    ptype += pressEvents/2 + (pressEvents % 2 != 0) - 1; // 
+                    ptype = static_cast<PressType>(static_cast<int>(ptype) + 
+                        pressEvents/2 + (pressEvents % 2 != 0) - 1); // 
                     holdTime = this_time;
                     return ptype;
                 }
@@ -99,7 +102,21 @@ PressType Button::monitorPress(){
             }
         }
         else{ // Is waiting, and currently inactive
+            // Serial.println("Waiting Inactive");
+            // Serial.println("Press events:");
+            // Serial.println(pressEvents);
+            // Serial.println("previous:");
+            // Serial.println(previousWaitingState());
+
             if (previousWaitingState()){ // Case: Is inactive was active
+                
+
+                if (wasHeld()){ // If it was held, we're done
+                    pressEvents = 0;
+                    holdTime = 0;
+                    return INDETERM;
+                }
+
                 holdTime = 0;
 
                 if (pressEvents == 5){ // If already triple press, imediately
@@ -107,19 +124,18 @@ PressType Button::monitorPress(){
                     return TRIPLE;      // determine triple press
                 }
 
-                if (wasHeld()){ // If it was held, we're done
-                    pressEvents = 0;
-                    return INDETERM;
-                }
-
                 pressEvents++;
                 return INDETERM;
             }
             else{ // Case: Is inactive was inactive
                 unsigned long this_time = millis();
+                // Serial.println("Double Inactive");
+                // Serial.println("For how long:");
+                // Serial.println(this_time - steadyTime);
                 if (this_time - steadyTime > pressWindow){ // Press window passed
                     PressType ptype = SINGLE;
-                    ptype += pressEvents/2 - 1; // 
+                    ptype = static_cast<PressType>(static_cast<int>(ptype) +
+                        pressEvents/2 - 1); // 
                     pressEvents = 0;
                     return ptype;
                 }

@@ -11,13 +11,13 @@ enum SteadyState{
 };
 
 enum PressType{
-    INDETERM,
-    SINGLE,
-    DOUBLE,
-    TRIPLE,
-    SINGLE_HOLD,
-    DOUBLE_HOLD,
-    TRIPLE_HOLD
+    INDETERM = 0,
+    SINGLE = 1,
+    DOUBLE = 2,
+    TRIPLE = 3,
+    SINGLE_HOLD = 4,
+    DOUBLE_HOLD = 5,
+    TRIPLE_HOLD = 6
 };
 
 class Button{
@@ -40,7 +40,7 @@ class Button{
         
 
     public:
-        Button(int pin, unsigned long jitterDelay = 20, int activeState = LOW, unsigned long pressWindow = 500, unsigned long holdWindow = 1000);
+        Button(int pin, unsigned long jitterDelay = 5, int activeState = LOW, unsigned long pressWindow = 200, unsigned long holdWindow = 300);
         // TODO: Move these to private
         int rawRead() const;
         void steadyRead();
