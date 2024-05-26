@@ -82,7 +82,7 @@ PressType Button::monitorPress(){
     if (isWaiting()){
         if (isActive()){ // Is waiting and now active
             if(previousWaitingState()){ // Case: Is active was active
-                this_time = millis();
+                unsigned long this_time = millis();
                 if (this_time - steadyTime > holdWindow){
                     PressType ptype = SINGLE_HOLD;
                     ptype += pressEvents/2 + (pressEvents % 2 != 0) - 1; // 
@@ -116,7 +116,7 @@ PressType Button::monitorPress(){
                 return INDETERM;
             }
             else{ // Case: Is inactive was inactive
-                this_time = millis();
+                unsigned long this_time = millis();
                 if (this_time - steadyTime > pressWindow){ // Press window passed
                     PressType ptype = SINGLE;
                     ptype += pressEvents/2 - 1; // 
