@@ -3,22 +3,46 @@
 
 #include <stdio.h>
 #include <Arduino.h>
-#include <circle_buf.h>
 
 enum SteadyState{
     PRESSED,
     RELEASED
 };
 
+// enum PressType{
+//     INDETERM = 0,
+//     SINGLE = 1,
+//     DOUBLE = 2,
+//     TRIPLE = 3,
+//     SINGLE_HOLD = 4,
+//     DOUBLE_HOLD = 5,
+//     TRIPLE_HOLD = 6
+// };
+
 enum PressType{
-    INDETERM = 0,
-    SINGLE = 1,
-    DOUBLE = 2,
-    TRIPLE = 3,
-    SINGLE_HOLD = 4,
-    DOUBLE_HOLD = 5,
-    TRIPLE_HOLD = 6
+    INDETERM,
+    PRESS,
+    HOLD
 };
+
+struct PressEvent{
+    PressType type;
+    int amount;
+
+    public:
+        PressEvent(PressType t = INDETERM, int a = 0);
+        bool ispress(PressType t, int a);
+        bool isindeterm();
+};
+
+
+
+
+// bool operator==(const PressEvent& lhs, const PressEvent& rhs)
+// {
+//     return lhs.type == rhs.type && lhs.amount == rhs.amount;
+// }
+
 
 class Button{
     private:
@@ -42,7 +66,7 @@ class Button{
         
 
     public:
-        Button(int pin, unsigned long jitterDelay = 5, int activeState = LOW, unsigned long pressWindow = 200, unsigned long holdWindow = 300, int maxPresses = 3);
+        Button(int pin, unsigned long jitterDelay = 15, int activeState = LOW, unsigned long pressWindow = 200, unsigned long holdWindow = 300, int maxPresses = 3);
         // TODO: Move these to private
         int rawRead() const;
         void steadyRead();
@@ -55,7 +79,7 @@ class Button{
         bool previousWaitingState() const;
         bool wasHeld() const;
 
-        PressType monitorPress();
+        PressEvent monitorPress();
         
         
 };
