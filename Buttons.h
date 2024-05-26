@@ -35,12 +35,14 @@ class Button{
         unsigned long holdWindow;   // Time window for which the button
                                     // is considered held
         unsigned long holdTime;     // Time for which the button has been held
+        int maxPresses;             // Maximum number of consecutive presses
+                                    // that can be registered
         
         int pressEvents; // How many press events have been recorded before
         
 
     public:
-        Button(int pin, unsigned long jitterDelay = 5, int activeState = LOW, unsigned long pressWindow = 200, unsigned long holdWindow = 300);
+        Button(int pin, unsigned long jitterDelay = 5, int activeState = LOW, unsigned long pressWindow = 200, unsigned long holdWindow = 300, int maxPresses = 3);
         // TODO: Move these to private
         int rawRead() const;
         void steadyRead();

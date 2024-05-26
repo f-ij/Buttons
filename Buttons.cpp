@@ -1,6 +1,6 @@
 #include <Buttons.h>
 
-Button::Button(int pin, unsigned long jitterDelay, int activeState, unsigned long pressWindow, unsigned long holdWindow):
+Button::Button(int pin, unsigned long jitterDelay, int activeState, unsigned long pressWindow, unsigned long holdWindow, int maxPresses):
     pin(pin),
     steadyState(HIGH),
     lastRawState(HIGH),
@@ -12,6 +12,7 @@ Button::Button(int pin, unsigned long jitterDelay, int activeState, unsigned lon
     pressWindow(pressWindow),
     holdWindow(holdWindow),
     holdTime(0),
+    maxPresses(maxPresses),
     pressEvents(0)
 {
     pinMode(pin, INPUT); // Set the pin as input
@@ -34,11 +35,6 @@ void Button::steadyRead(){
             steadyTime = millis();
         }
     }
-    // Serial.println(millis() - lastRawTime);
-    // If the state has been steady for long enough
-    // Then we update the new state and note down the time
-    
-    // return steadyState;
 };
 
 int Button::getState() const{
@@ -102,12 +98,6 @@ PressType Button::monitorPress(){
             }
         }
         else{ // Is waiting, and currently inactive
-            // Serial.println("Waiting Inactive");
-            // Serial.println("Press events:");
-            // Serial.println(pressEvents);
-            // Serial.println("previous:");
-            // Serial.println(previousWaitingState());
-
             if (previousWaitingState()){ // Case: Is inactive was active
                 
 
@@ -119,9 +109,13 @@ PressType Button::monitorPress(){
 
                 holdTime = 0;
 
-                if (pressEvents == 5){ // If already triple press, imediately
+                if (pressEvents == maxPresses*2-1){ // If max presses reached
+                                                    // Immediately terminate
+                    PressType ptype = SINGLE;
+                    ptype = static_cast<PressType>(static_cast<int>(ptype) +
+                        pressEvents/2 - 1);
                     pressEvents = 0;
-                    return TRIPLE;      // determine triple press
+                    return ptype;      // determine press
                 }
 
                 pressEvents++;
@@ -129,9 +123,6 @@ PressType Button::monitorPress(){
             }
             else{ // Case: Is inactive was inactive
                 unsigned long this_time = millis();
-                // Serial.println("Double Inactive");
-                // Serial.println("For how long:");
-                // Serial.println(this_time - steadyTime);
                 if (this_time - steadyTime > pressWindow){ // Press window passed
                     PressType ptype = SINGLE;
                     ptype = static_cast<PressType>(static_cast<int>(ptype) +
