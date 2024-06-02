@@ -9,40 +9,37 @@ enum SteadyState{
     RELEASED
 };
 
-// enum PressType{
-//     INDETERM = 0,
-//     SINGLE = 1,
-//     DOUBLE = 2,
-//     TRIPLE = 3,
-//     SINGLE_HOLD = 4,
-//     DOUBLE_HOLD = 5,
-//     TRIPLE_HOLD = 6
-// };
-
 enum PressType{
     INDETERM,
     PRESS,
     HOLD
 };
 
-struct PressEvent{
+class PressEvent{
     PressType type;
     int amount;
+    unsigned long time;
+    bool triggd;
+    
 
     public:
-        PressEvent(PressType t = INDETERM, int a = 0);
-        bool ispress(PressType t, int a);
-        bool isindeterm();
+        PressEvent(PressType t = INDETERM, int a = 0, unsigned long time = 0 , bool triggd = false);
+        void settype(PressType t);              // Set the type of the event
+        void setamount(int a);                  // Set the amount of the event
+        void settime(unsigned long t);          // Set the time of the event
+        void settriggd(bool t);                 // Set the event as triggered
+
+        bool istriggered() const;               // Check if the hold event 
+                                                // has been triggered
+        
+
+        bool isindeterm() const;                // Check if the event is 
+                                                // indeterminate
+        int ispress(PressType t) const; // Check if the event is of type
+                                                // t and amount a
+        void retrig(unsigned long time);        // Retrigger the after a delay
+
 };
-
-
-
-
-// bool operator==(const PressEvent& lhs, const PressEvent& rhs)
-// {
-//     return lhs.type == rhs.type && lhs.amount == rhs.amount;
-// }
-
 
 class Button{
     private:
@@ -62,7 +59,8 @@ class Button{
         int maxPresses;             // Maximum number of consecutive presses
                                     // that can be registered
         
-        int pressEvents; // How many press events have been recorded before
+        int stableEvents; // How many press events have been recorded before
+        PressEvent pevent; // Last event recorded
         
 
     public:
@@ -79,7 +77,14 @@ class Button{
         bool previousWaitingState() const;
         bool wasHeld() const;
 
-        PressEvent monitorPress();
+        int press() const;    // Check if button is pressed num times
+        int holdTriggered() const;      // Check if button is held, but only once
+        int held() const;               // Check if the button is held
+        void retrig(unsigned long delay); // Set the time of the press event
+                                        // to a future time so that it will trigger
+                                        // again later
+
+        void monitorPress();
         
         
 };
