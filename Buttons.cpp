@@ -10,12 +10,16 @@ PressEvent::PressEvent(PressType t,
             triggd(triggd)
         {};
 
-void settype(PressType t){
-    type = t;
+unsigned long PressEvent::eventtime() const{
+    return time;
+};
+
+int PressEvent::triggered() const{
+    return triggd;
 };
 
 int PressEvent::ispress(PressType t) const{
-    if (type == t && amount == a){
+    if (type == t){
         return amount;
     }
     return 0;
@@ -37,24 +41,27 @@ void PressEvent::settime(unsigned long t){
     time = t;
 };
 
-void PressEvent::settriggd(bool t){
+void PressEvent::settriggd(int t){
     triggd = t;
 };
 
+void PressEvent::sethold(int amount, unsigned long time){
+    if (type != HOLD){
+        settype(HOLD);
+        setamount(amount);
+        settime(time);
+    }
+};
+
 bool PressEvent::istriggered() const{
-    return triggd;
+    return triggd == 2;
 };
 
 bool PressEvent::isindeterm() const{
     return type == INDETERM;
 };
 
-void PressEvent::retrig(unsigned long delay){
-    triggd = false;
-    time = millis() + delay;
-};
-
-Button::Button(int pin, unsigned long jitterDelay, int activeState, unsigned long pressWindow, unsigned long holdWindow, int maxPresses):
+Button::Button(int pin, int maxPresses, unsigned long retrigTime, unsigned long jitterDelay, int activeState, unsigned long pressWindow, unsigned long holdWindow):
     pin(pin),
     steadyState(HIGH),
     lastRawState(HIGH),
@@ -67,6 +74,7 @@ Button::Button(int pin, unsigned long jitterDelay, int activeState, unsigned lon
     holdWindow(holdWindow),
     holdTime(0),
     maxPresses(maxPresses),
+    retrigTime(retrigTime),
     stableEvents(0),
     pevent(PressEvent())
 {
@@ -117,32 +125,32 @@ bool Button::previousWaitingState() const{
 };
 
 bool Button::wasHeld() const{
-    return holdTime != 0;
+    // return holdTime != 0;
+    return pevent.ispress(HOLD);
+};
+
+bool Button::nopress() const{
+    return pevent.isindeterm();
 };
 
 int Button::press() const{
     return pevent.ispress(PRESS);
 };
 
-int Button::holdTriggered() const{
-    auto holdnum = pevent.ispress(HOLD)
-    if (holdnum != 0 && !pevent.triggd && millis() >= pevent.time)
+int Button::holdTriggered(){
+    auto holdnum = pevent.ispress(HOLD);
+    if (pevent.triggered() == 1)
     {
-        pevent.settriggd(true);
         return holdnum;
-    }
+    };
 
-    return 0
+    return 0;
 };
 
-int Button:held() const{
+int Button::held() const{
     return pevent.ispress(HOLD);
 };
 
-
-void Button::retrig(unsigned long delay){
-    pevent.retrig(delay);
-};
 
 void Button::monitorPress(){
     steadyRead();
@@ -160,16 +168,25 @@ void Button::monitorPress(){
         if (isActive()){ // Is waiting and now active
             if(previousWaitingState()){ // Case: Is active was active
                 unsigned long this_time = millis();
-                if (this_time - steadyTime > holdWindow 
-                        && !(pevent.istriggered())){ // If long enough, it's held
+                if (this_time - steadyTime > holdWindow ){ 
+                                                    // If long enough, it's held
                                                     // and it was not already
                                                     // triggered    
-                    int pamount = stableEvents/2 + 1 ; //
-                    pevent.settype(HOLD);
-                    pevent.setamount(pamount);
-                    pevent.settime(this_time);
-    
-                    holdTime = this_time; // is this still neccesary?
+                    if (pevent.triggered() == 0){       // If not already triggered
+                        int pamount = stableEvents/2 + 1 ; //
+                        pevent.sethold(pamount, this_time);
+                        pevent.settriggd(1);
+                        // holdTime = this_time; // is this still neccesary?
+                    }
+                    else if (pevent.triggered() == 1){ // If already triggered
+                        pevent.settriggd(2);
+                        pevent.settime(millis()+retrigTime);
+                    }
+                    else if (millis() > pevent.eventtime()){
+                        pevent.settriggd(1);
+                    }
+
+                    return;
                 }
                 else{
                     goto indeterm_event;
@@ -186,17 +203,17 @@ void Button::monitorPress(){
 
                 if (wasHeld()){ // If it was held, we're done
                     stableEvents = 0;
-                    holdTime = 0;
                     goto indeterm_event;
                 }
 
-                holdTime = 0;
+                // holdTime = 0;
 
                 if (stableEvents == maxPresses*2-1){ // If max presses reached
                                                     // Immediately terminate
                     pevent.settype(PRESS);
                     pevent.setamount(maxPresses);
                     stableEvents = 0;
+                    return;
                 }
 
                 stableEvents++;
@@ -209,7 +226,7 @@ void Button::monitorPress(){
                     pevent.settype(PRESS);
                     pevent.setamount(pamount);
                     stableEvents = 0;
-                    // return pevent;
+                    return;
                 }
                 else{
                     goto indeterm_event;
@@ -217,11 +234,29 @@ void Button::monitorPress(){
             }
         }
     }
+
+    return;
     indeterm_event:{
         if (!pevent.isindeterm()){
             pevent.settype(INDETERM);
             pevent.settime(millis());   
-            pevent.settriggd(false);
+            pevent.settriggd(0);
         }
+        return;
     }
-};s
+};
+
+
+void Button::showEvent() const{
+    if (pevent.isindeterm()){
+        Serial.println("Indeterminate");
+    }
+    else if (pevent.ispress(PRESS)){
+        Serial.print("Press: ");
+        Serial.println(pevent.ispress(PRESS));
+    }
+    else if (pevent.ispress(HOLD)){
+        Serial.print("Hold: ");
+        Serial.println(pevent.ispress(HOLD));
+    }
+};

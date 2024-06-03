@@ -19,15 +19,21 @@ class PressEvent{
     PressType type;
     int amount;
     unsigned long time;
-    bool triggd;
+    int triggd;
     
 
     public:
         PressEvent(PressType t = INDETERM, int a = 0, unsigned long time = 0 , bool triggd = false);
+        unsigned long eventtime() const;           // Get the time of the event
+        int triggered() const;                 // Get the triggered 
+                                                // status of the event
+        
+
         void settype(PressType t);              // Set the type of the event
         void setamount(int a);                  // Set the amount of the event
         void settime(unsigned long t);          // Set the time of the event
-        void settriggd(bool t);                 // Set the event as triggered
+        void settriggd(int t);                 // Set the event as triggered
+        void sethold(int amount, unsigned long time); // Set the event as hold
 
         bool istriggered() const;               // Check if the hold event 
                                                 // has been triggered
@@ -37,8 +43,6 @@ class PressEvent{
                                                 // indeterminate
         int ispress(PressType t) const; // Check if the event is of type
                                                 // t and amount a
-        void retrig(unsigned long time);        // Retrigger the after a delay
-
 };
 
 class Button{
@@ -58,13 +62,17 @@ class Button{
         unsigned long holdTime;     // Time for which the button has been held
         int maxPresses;             // Maximum number of consecutive presses
                                     // that can be registered
+
+        unsigned long retrigTime;   // Time to retrigger the button
         
         int stableEvents; // How many press events have been recorded before
         PressEvent pevent; // Last event recorded
         
 
     public:
-        Button(int pin, unsigned long jitterDelay = 15, int activeState = LOW, unsigned long pressWindow = 200, unsigned long holdWindow = 300, int maxPresses = 3);
+        Button(int pin, int maxPresses = 3, unsigned long retrigTime = 750, 
+                unsigned long jitterDelay = 7, int activeState = LOW, 
+                unsigned long pressWindow = 200, unsigned long holdWindow = 300);
         // TODO: Move these to private
         int rawRead() const;
         void steadyRead();
@@ -77,14 +85,14 @@ class Button{
         bool previousWaitingState() const;
         bool wasHeld() const;
 
-        int press() const;    // Check if button is pressed num times
-        int holdTriggered() const;      // Check if button is held, but only once
+        bool nopress() const;        // Check if the button is not pressed
+        int press() const;          // Check if button is pressed num times
+        int holdTriggered();        // Check if button is held, but only once
         int held() const;               // Check if the button is held
-        void retrig(unsigned long delay); // Set the time of the press event
-                                        // to a future time so that it will trigger
-                                        // again later
-
+  
         void monitorPress();
+
+        void showEvent() const;
         
         
 };
