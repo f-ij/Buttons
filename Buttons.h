@@ -22,6 +22,7 @@ class PressEvent{
     PressType type;
     int amount;
     unsigned long time;
+    unsigned long waittime;
     int triggd;
     
 
@@ -120,7 +121,7 @@ class Button{
         int lastRawState;           // Last state of the button
         unsigned long lastRawTime;  // Time of last change
         unsigned long steadyTime;   // Time when the state became steady
-        unsigned long jitterDelay;  // Jitter delay
+        unsigned long steadyDelay;  // Jitter delay
         bool stateRead; // To check if some state has already been read
                         // To prevent multiple reads of the same state
         int activeState;            // Active state of the button, HIGH or LOW
@@ -132,21 +133,33 @@ class Button{
                                     // that can be registered
 
         unsigned long retrigTime;   // Time to retrigger the button
+        unsigned long manualRetrigTime; // Time to manually retrigger the button
         
         int stableEvents; // How many press events have been recorded before
         PressEvent pevent; // Last event recorded
         
 
     public:
-        Button(int pin, int maxPresses = 3, unsigned long retrigTime = 750, 
-                unsigned long jitterDelay = 7, int activeState = LOW, 
+        Button(int pin, int maxPresses = 3, unsigned long retrigTime = 500, 
+                unsigned long steadyDelay = 7, int activeState = LOW, 
                 unsigned long pressWindow = 225, unsigned long holdWindow = 300);
-        // TODO: Move these to private
+        
+        void pullUpMode() const { pinMode(pin, INPUT_PULLUP);};
+   
         int rawRead() const;
         void steadyRead();
-        //
+
         int getState() const;
-        void setDelay(const unsigned long newdelay);
+
+        // Setters
+        void setSteadyDelay(const unsigned long newdelay);
+        void setPressWindow(const unsigned long newwindow);
+        void setHoldWindow(const unsigned long newwindow);
+        void setMaxPresses(const int newmax);
+        void setRetrigTime(const unsigned long newtime);
+        void setActiveState(const int newstate);
+
+
         bool isInactive() const;
         bool isActive() const;
         bool isWaiting() const;
@@ -158,13 +171,17 @@ class Button{
 
         bool nopress() const;        // Check if the button is not pressed
 
-        template <ButtonType U = T>
+        template <ButtonType U = T> // Don't compile 
         typename std::enable_if<U == ONLYPRESS || U == BOTH, int>::type
         press() const;          // Check if button is pressed num times
 
         template <ButtonType U = T>
         typename std::enable_if<U == ONLYHOLD || U == BOTH, int>::type
-        holdTriggered();        // Check if button is held, but only once
+        holdSingle();        // Check if button is held, but only once
+
+        template <ButtonType U = T>
+        typename std::enable_if<U == ONLYHOLD || U == BOTH, int>::type
+        holdRepeat();        // Check if button is held, but repeated
 
         template <ButtonType U = T>
         typename std::enable_if<U == ONLYHOLD || U == BOTH, int>::type
@@ -177,13 +194,16 @@ class Button{
         
 };
 template <ButtonType T>
-Button<T>::Button(int pin, int maxPresses, unsigned long retrigTime, unsigned long jitterDelay, int activeState, unsigned long pressWindow, unsigned long holdWindow):
+Button<T>::Button(int pin, int maxPresses, 
+                    unsigned long retrigTime, unsigned long steadyDelay, 
+                    int activeState, unsigned long pressWindow, 
+                    unsigned long holdWindow):
     pin(pin),
     steadyState(HIGH),
     lastRawState(HIGH),
     lastRawTime(0),
     steadyTime(0),
-    jitterDelay(jitterDelay),
+    steadyDelay(steadyDelay),
     stateRead(false),
     activeState(LOW),
     pressWindow(pressWindow),
@@ -191,6 +211,7 @@ Button<T>::Button(int pin, int maxPresses, unsigned long retrigTime, unsigned lo
     holdTime(0),
     maxPresses(maxPresses),
     retrigTime(retrigTime),
+    manualRetrigTime(0),
     stableEvents(0),
     pevent(PressEvent())
 {
@@ -209,7 +230,7 @@ void Button<T>::steadyRead(){
         lastRawState = readstate;      // save the new state
         lastRawTime = millis();   // note the time
     }
-    else if (millis() - lastRawTime > jitterDelay){
+    else if (millis() - lastRawTime > steadyDelay){
         if (readstate != steadyState){ // If the state has been steady for long enough
             steadyState = readstate;
             stateRead = false;
@@ -224,8 +245,33 @@ int Button<T>::getState() const{
 };
 
 template <ButtonType T>
-void Button<T>::setDelay(const unsigned long newdelay){
-    jitterDelay = newdelay;
+void Button<T>::setSteadyDelay(const unsigned long newdelay){
+    steadyDelay = newdelay;
+};
+
+template <ButtonType T>
+void Button<T>::setPressWindow(const unsigned long newwindow){
+    pressWindow = newwindow;
+};
+
+template <ButtonType T>
+void Button<T>::setHoldWindow(const unsigned long newwindow){
+    holdWindow = newwindow;
+};
+
+template <ButtonType T> 
+void Button<T>::setMaxPresses(const int newmax){
+    maxPresses = newmax;
+};
+
+template <ButtonType T> 
+void Button<T>::setRetrigTime(const unsigned long newtime){
+    retrigTime = newtime;
+};
+
+template <ButtonType T>
+void Button<T>::setActiveState(const int newstate){
+    activeState = newstate;
 };
 
 template <ButtonType T>
@@ -268,14 +314,31 @@ Button<T>::press() const{
     return pevent.ispress(PRESS);
 };
 
+// This works as follows:
+// If the button is held,
+// Monitorbutton will only have one cycle where triggered is 1 before setting 
+// it to 2. When it is one it will register a hold. 2 is the waiting state
+// which will be set to 1 after the retrigger time has passed. 
 template <ButtonType T>
 template <ButtonType U>
 typename std::enable_if<U == ONLYHOLD || U == BOTH, int>::type
-Button<T>::holdTriggered(){
-    auto holdnum = pevent.ispress(HOLD);
+Button<T>::holdSingle(){
     if (pevent.triggered() == 1)
     {
-        return holdnum;
+        manualRetrigTime = 4294967295;
+        return pevent.ispress(HOLD);
+    };
+
+    return 0;
+};
+
+template <ButtonType T>
+template <ButtonType U>
+typename std::enable_if<U == ONLYHOLD || U == BOTH, int>::type
+Button<T>::holdRepeat(){
+    if (pevent.triggered() == 1)
+    {
+        return pevent.ispress(HOLD);
     };
 
     return 0;
@@ -321,10 +384,20 @@ void Button<T>::monitorPress(){
                         }
                         else if (pevent.triggered() == 1){ // If already triggered
                             pevent.settriggd(2);
-                            pevent.settime(millis()+retrigTime);
+                            pevent.settime(millis());  
                         }
-                        else if (millis() > pevent.eventtime()){
-                            pevent.settriggd(1);
+                        else{ // pevent.triggered() == 2
+                            if (manualRetrigTime == 0){ // If not manually retriggered
+                                                        // just wait for the retrigger time
+                                if (millis() - pevent.eventtime() > retrigTime)
+                                pevent.settriggd(1);
+                            }
+                            else{   // If manually retriggered use that time once   
+                                if (millis() - pevent.eventtime() > manualRetrigTime){
+                                    manualRetrigTime = 0;
+                                    pevent.settriggd(1);
+                                }
+                            }
                         }
 
                         return;
@@ -348,6 +421,7 @@ void Button<T>::monitorPress(){
                 
                 if constexpr (T == ONLYHOLD || T == BOTH){
                     if (wasHeld()){ // If it was held, we're done
+                        manualRetrigTime = 0;
                         stableEvents = 0;
                         goto indeterm_event;
                     }
